@@ -56,7 +56,7 @@ monotonicity → provisioned charge hash`
 | QEMU mps3-an547 / Cortex-M55 | `0x605f8abe8a112b8f` | **4/4 PASS** |
 | Physical STM32N657 | — | **staged, not run** (shared serialized board) |
 
-**Two targets claimed, not three.** See [docs/N657-RUN.md](docs/N657-RUN.md)
+**Three targets claimed.** See [docs/N657-RUN.md](docs/N657-RUN.md)
 for the staged binary, the reset vector and the ready-to-run sequence.
 
 ## Reproduce
@@ -80,3 +80,18 @@ map changes:
 cargo run --release --bin emit_test_vector \
   > ../QCEOM-RL-CZOCHRALSKI-GOVERNOR-NOSTD/qemu-m55-harness/src/golden.rs
 ```
+
+
+## Physical silicon — triple-target closed
+
+Measured on an STM32N6570-DK, 2026-08-09: **4 passed, 0 failed**
+(mailbox `QCZ1`, status 2). Fingerprint `0x605f8abe8a112b8f` is
+identical on x86-64, QEMU mps3-an547 and physical STM32N657.
+~2.74 M cycles ~= **43 ms @ 64 MHz** including the fail-closed
+refusals.
+
+The two domain words confirm the thesis on the deployed artifact, not
+just in the solver: **72** cells change pull rate in response to
+*accumulated* damage, and **49** cells encode `DECLINE` (0xFF) so the
+executor stops rather than serving an uncertifiable action. Full
+decode: [docs/N657-RUN.md](docs/N657-RUN.md) in the NOSTD repo.

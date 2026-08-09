@@ -86,3 +86,48 @@ targets, not three**.
   to bisect that cheaply if it recurs.
 - **Always check the mailbox magic before trusting any other word** — AXISRAM
   retains the previous run's data across loads.
+
+---
+
+## MEASURED RESULT — physical STM32N6570-DK, 2026-08-09
+
+Run by the lead developer; the build agent staged the binary and did
+not take the board.
+
+```
+0x34178000 : 315A4351 00000002 00000004 00000000
+0x34178010 : 8A112B8F 605F8ABE 550FD984 0009C469
+0x34178020 : 000DC7F8 000853CB 0009F19E 00000004
+0x34178030 : 00000006 00000048 00000031
+```
+
+Every expected value matches:
+
+| Field | Expected | Measured |
+|---|---|---|
+| magic `QCZ1` | `0x315A4351` | ✓ |
+| status | 2 = all passed | ✓ |
+| passed / failed | 4 / 0 | ✓ |
+| map fingerprint | `0x605F8ABE8A112B8F` | ✓ |
+| progress / fine marker | 4 / 6 | ✓ |
+| damage-responsive cells | 72 | ✓ (`0x48`) |
+| **DECLINE cells** | 49 | ✓ (`0x31`) |
+
+Image CRC32 recomputed on silicon: `0x550FD984`. DWT cycles:
+639,593 · 902,136 · 545,227 · 651,678 — ≈ 2.74 M total ≈ **43 ms @
+64 MHz** including the fail-closed refusals.
+
+**Triple-target bit-determinism closed**: fingerprint
+`0x605f8abe8a112b8f` is identical on x86-64, QEMU mps3-an547 and
+physical STM32N657.
+
+The two domain words are the ones worth reading. 72 cells change their
+pull rate in response to *accumulated* damage — that is the harness's
+whole thesis, confirmed on the deployed artifact rather than in the
+solver. And 49 cells encode `DECLINE` (0xFF): states the solver could
+not certify, where the executor stops instead of serving an arbitrary
+action. That defect was caught by the QEMU rung, not by hosted tests.
+
+Note for anyone reading a raw dump: words beyond [14] in this mailbox
+are **stale data from a previous harness's run** — AXISRAM persists
+across loads. Always check the magic first.
