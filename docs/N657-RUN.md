@@ -246,3 +246,53 @@ words [4,5] say.
 Already re-verified off-board on the third image: hosted x86-64 18/18,
 NOSTD host 4/4, QEMU mps3-an547 / Cortex-M55 **4/4** (72 responsive
 cells, 49 declines — both unchanged, as expected for an unchanged map).
+
+---
+
+## RE-VERIFIED ON SILICON — corrected `charge_hash`, 2026-08-09
+
+```
+0x34178000 : 315A4351 00000002 00000004 00000000
+0x34178010 : 8A112B8F 605F8ABE 12F5CD74 0009C469
+0x34178020 : 000DC7F8 000853CB 0009F19E 00000004
+0x34178030 : 00000006 00000048 00000031
+```
+
+| Field | Expected | Measured |
+|---|---|---|
+| magic `QCZ1` | `0x315A4351` | ✓ |
+| status | 2 | ✓ |
+| passed / failed | 4 / 0 | ✓ |
+| fingerprint | `0x605F8ABE8A112B8F` (**unchanged**) | ✓ |
+| **CRC32** | **`0x12F5CD74`** (was `0xD983D89B`) | ✓ |
+| progress / marker | 4 / 6 | ✓ |
+| responsive / declined cells | 72 / 49 | ✓ |
+
+**The fingerprint is unchanged and that is correct.** `charge_hash` now
+covers the Stefan/heat-transport group (`RHO_S`, `L_FUS`, `K_SOL`,
+`K_LIQ`, `T_MELT`) plus `SLIP_LIMIT` and `DT_H`, but hashing more
+constants does not move the solved map — and χ / `P_DAMAGE` were swept
+only in `falsifier/falsifier.py`, so `src/crystal.rs` is byte-identical
+to its pre-fix state. **Word [6] is therefore the only freshness proof
+on this run**, and it moved.
+
+### Why the old hash was dangerous
+
+`K_SOL` 22 → 25 W/m·K — a plausible literature revision — moves
+**61.8% of the shipped map**, 23.3% of pull time and 75.5% of the
+corpus cells. Under the old hash the image still validated and the
+existing pinned-hash test still passed. That test was written to
+prevent exactly this and was one constant-group short.
+
+The replacement is a **source-scanning omission guard**
+(`src/image.rs`, `every_declared_model_constant_is_hashed`) rather than
+a longer hand-maintained list. It brace-matches the hash function body,
+strips comments so naming a constant in prose cannot satisfy it,
+asserts every `pub const` appears as a whole identifier, carries a
+`SUBSUMED` allowlist that demands a written justification per
+exemption, and floors the match count so it fails loudly rather than
+passing vacuously. It caught `SLIP_LIMIT` and `DT_H` on its first run.
+
+A pinned literal and a scan fail on different things: a pin catches a
+*change* to a covered constant, only a scan catches a constant that was
+*never* covered.
