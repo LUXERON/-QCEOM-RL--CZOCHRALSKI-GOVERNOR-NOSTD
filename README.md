@@ -33,21 +33,34 @@ checks rather than assumes.
 `magic → version → CRC32 → map fingerprint → tier range → decline
 monotonicity → provisioned charge hash`
 
-- **Charge hash.** The map is bound to the crucible charge, to the
-  material constants that give it meaning, **and (since 2026-08-09) to the
-  codec** — the pull/heater action tiers and the state band lattice. A map
-  solved for a different ingot diameter, a different melt gradient, under a
-  revised material constant, or against a re-based band grid is refused
-  before a single band is pulled. This refusal is load-bearing: the
-  design-around posture (no online ADC loop, no in-pull adaptive melt
-  model) rests on the map being re-solved per charge, so a stale map must be
-  *detectable*, not merely discouraged.
+- **Charge hash.** The map is bound to the crucible charge, to the material
+  constants that give it meaning — **both the stress group and (since
+  2026-08-09) the heat-transport group** — and to the **codec**, the
+  pull/heater action tiers and the state band lattice. A map solved for a
+  different ingot diameter, a different melt gradient, under a revised material
+  constant, or against a re-based band grid is refused before a single band is
+  pulled. This refusal is load-bearing: the design-around posture (no online
+  ADC loop, no in-pull adaptive melt model) rests on the map being re-solved
+  per charge, so a stale map must be *detectable*, not merely discouraged.
 
-  > **Image superseded 2026-08-09**: charge hash `0x3A72DADABEF89140` →
-  > `0xB493141295394B69`, image CRC32 `0x550FD984` → `0xD983D89B`. The map
-  > fingerprint `0x605F8ABE8A112B8F` is **unchanged** — only the provenance
-  > binding moved. Host and QEMU rungs re-run on the new image; the
-  > physical-silicon section below pertains to the previous one and the
+  > **Image superseded twice on 2026-08-09.**
+  >
+  > | | Charge hash | Image CRC32 | Map fingerprint |
+  > |---|---|---|---|
+  > | original | `0x3A72DADABEF89140` | `0x550FD984` | `0x605F8ABE8A112B8F` |
+  > | + codec | `0xB493141295394B69` | `0xD983D89B` | unchanged |
+  > | **+ heat transport** | **`0x46AD61386DE01E5D`** | **`0x12F5CD74`** | unchanged |
+  >
+  > The second fix closed an **outright defect**, not a latent one: the hash
+  > omitted `RHO_S`, `L_FUS`, `K_SOL`, `K_LIQ` and `T_MELT`, so revising
+  > `K_SOL` from 22 to 25 W/(m·K) re-solved 61.8% of the map and 23.3% of the
+  > pull time while every fielded image kept validating — a silent mis-serve.
+  >
+  > The map fingerprint is **unchanged across all three images**, so the
+  > fingerprint **cannot prove a board is freshly flashed**. The image CRC32 at
+  > mailbox word [6] is the only word that can, and it must read
+  > **`0x12F5CD74`**. Host and QEMU rungs re-run on the new image; the
+  > physical-silicon section below pertains to the *previous* one and the
   > board must be re-flashed.
 - **`DECLINE` (0xFF).** Cells with no certifiable command say so explicitly.
   A pull that has banked too much damage early cannot finish the body without
@@ -61,12 +74,14 @@ monotonicity → provisioned charge hash`
 
 | Target | Map fingerprint | Result |
 |---|---|---|
-| x86-64 (hosted emitter) | `0x605f8abe8a112b8f` | reference |
-| QEMU mps3-an547 / Cortex-M55 | `0x605f8abe8a112b8f` | **4/4 PASS** |
-| Physical STM32N657 | — | **staged, not run** (shared serialized board) |
+| x86-64 (hosted emitter) | `0x605f8abe8a112b8f` | reference, 4/4 host tests |
+| QEMU mps3-an547 / Cortex-M55 | `0x605f8abe8a112b8f` | **4/4 PASS** (current image) |
+| Physical STM32N657 | `0x605f8abe8a112b8f` | **4/4 PASS** on images 1 and 2; **image 3 pending re-flash** |
 
 **Three targets claimed.** See [docs/N657-RUN.md](docs/N657-RUN.md)
 for the staged binary, the reset vector and the ready-to-run sequence.
+*(The row above previously read "staged, not run" — two physical runs had
+happened and the line was stale.)*
 
 ## Reproduce
 
@@ -91,12 +106,18 @@ cargo run --release --bin emit_test_vector \
 ```
 
 
-## Physical silicon — triple-target closed *(previous image)*
+## Physical silicon — triple-target closed *(previous images)*
 
-> Real and retained; it measured the image whose charge hash was
-> `0x3A72DADABEF89140`. The map fingerprint it reports is still the
-> shipped one, but the provenance header changed — re-flash and re-run to
-> close the claim for the current image.
+> Real and retained. The board has been run **twice**: on image 1
+> (charge hash `0x3A72DADABEF89140`, CRC32 `0x550FD984`) and again on
+> image 2 after the codec remediation (`0xB493141295394B69`,
+> `0xD983D89B`) — both **4/4**.
+>
+> **Image 3 has not been run.** The heat-transport hash fix moved the
+> header and CRC again. The map fingerprint these runs report is still
+> the shipped one, which is exactly the problem: re-flash and confirm
+> **CRC32 `0x12F5CD74`** at mailbox word [6], because the fingerprint
+> alone cannot distinguish image 3 from either predecessor.
 
 Measured on an STM32N6570-DK, 2026-08-09: **4 passed, 0 failed**
 (mailbox `QCZ1`, status 2). Fingerprint `0x605f8abe8a112b8f` is
