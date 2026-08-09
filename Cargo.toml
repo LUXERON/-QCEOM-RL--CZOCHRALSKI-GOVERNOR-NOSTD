@@ -1,0 +1,13 @@
+[package]
+name = "cz-gov-nostd"
+version = "0.1.0"
+edition = "2021"
+license = "PROPRIETARY"
+authors = ["LUXERON"]
+description = "[QCEOM RL] Czochralski pull governor NOSTD twin - fail-closed QCCZ pull-map validator and accumulator-indexed command executor for crystal-puller controllers. Pure core, zero heap, zero floats on the device path."
+
+[dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1
