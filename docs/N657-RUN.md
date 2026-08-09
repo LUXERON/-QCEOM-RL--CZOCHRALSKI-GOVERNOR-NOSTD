@@ -158,3 +158,28 @@ action. That defect was caught by the QEMU rung, not by hosted tests.
 Note for anyone reading a raw dump: words beyond [14] in this mailbox
 are **stale data from a previous harness's run** — AXISRAM persists
 across loads. Always check the magic first.
+
+
+---
+
+## RE-VERIFIED ON SILICON AFTER REMEDIATION — 2026-08-09
+
+The gate-evaluability audit produced code changes to this harness, so
+the image above was superseded and the board was re-run. Measured:
+
+| Field | Expected | Measured |
+|---|---|---|
+| magic `QCZ1` | — | ✓ |
+| status | 2 = all passed | ✓ |
+| passed / failed | 4 / 0 | ✓ |
+| table fingerprint | `0x605F8ABE8A112B8F` | ✓ |
+| image CRC32 | `0xD983D89B` | ✓ |
+
+fingerprint unchanged; params hash and CRC changed (codec coverage).
+
+**Why the CRC is the word that matters on this re-run.** Five of the six
+remediated harnesses changed only their header hash, not their solved
+map — so the table fingerprint is identical before and after, and a
+board still holding the *old* image would report a correct fingerprint
+and look like a pass. The image CRC32 is the field that distinguishes
+them, and it was checked on every one.
